@@ -11,7 +11,9 @@ int main(int argc, char **argv)
     fill_config(argv, &config);
     if (!init_sim(&sim, &config))
 	    return (1);
-    print_coders(&sim);
+    print_status(&sim.coders[0], "is compiling");
+    precise_sleep(200);
+    print_status(&sim.coders[0], "is debugging");
     free_sim(&sim);
     return 0;
 }

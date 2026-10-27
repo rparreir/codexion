@@ -55,6 +55,7 @@ struct s_sim
 	void	precise_sleep(long ms);
 	void	init_coders(t_sim *sim);
 	int		init_sim(t_sim *sim, t_config *config);
+	void	print_status(t_coder *coder, char *message);
 	void	free_sim(t_sim *sim);
 /* debug.c (temporário) */
 void	print_config(t_config *config);

@@ -37,6 +37,16 @@ int	init_sim(t_sim *sim, t_config *config)
 	return (1);
 }
 
+void	print_status(t_coder *coder, char *message)
+{
+	t_sim	*sim;
+
+	sim = coder->shared;
+	pthread_mutex_lock(&sim->log_mutex);
+	printf("%ld %d %s\n", elapsed_ms(sim->start_time), coder->id, message);
+	pthread_mutex_unlock(&sim->log_mutex);
+}
+
 void	free_sim(t_sim *sim)
 {
 	pthread_mutex_destroy(&sim->log_mutex);
