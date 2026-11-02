@@ -9,8 +9,6 @@
 # include <unistd.h>
 # include <pthread.h>
 
-
-
 typedef struct s_config
 {
 	int		number_of_coders;
@@ -39,25 +37,50 @@ struct s_sim
 {
 	t_config		config;
 	long			start_time;
+	int				simulation_over;
 	pthread_mutex_t	log_mutex;
+	pthread_mutex_t	stop_mutex;
 	t_coder			*coders;
+	pthread_t		monitor;
+	int				started;
+	pthread_cond_t	start_cond;
+	int				ready;
 };
 
-/* protótipos, agrupados pelo ficheiro .c onde a função está */
-	int		check_arg_size(int argc);
-    int     is_only_digits(char *str);
-	int		fits_in_int(char *str);
-	int		print_error(char *message, char *arg);
-	int		parsing_validation(int argc, char **argv);
-	void	fill_config(char **argv, t_config *config);
-	long	get_time_ms(void);
-	long	elapsed_ms(long start);
-	void	precise_sleep(long ms);
-	void	init_coders(t_sim *sim);
-	int		init_sim(t_sim *sim, t_config *config);
-	void	print_status(t_coder *coder, char *message);
-	void	free_sim(t_sim *sim);
-/* debug.c (temporário) */
-void	print_config(t_config *config);
-void	print_coders(t_sim *sim);
+/* protótipos das funções usadas fora do seu ficheiro; as funções locais
+   (só usadas dentro do próprio .c) não estão aqui */
+
+/* parsing_helpers.c — validação de cada argumento */
+int		check_arg_size(int argc);
+int		is_only_digits(char *str);
+int		fits_in_int(char *str);
+int		print_error(char *message, char *arg);
+
+/* parsing.c — validar e guardar os argumentos */
+int		parsing_validation(int argc, char **argv);
+void	fill_config(char **argv, t_config *config);
+int		ends_before_start(t_config *config);
+
+/* time.c — relógio e espera precisa */
+long	get_time_ms(void);
+long	elapsed_ms(long start);
+void	precise_sleep(t_sim *sim, long ms);
+
+/* sim.c — criar e destruir a simulação, escrever logs */
+int		init_sim(t_sim *sim, t_config *config);
+void	print_status(t_coder *coder, char *message);
+void	free_sim(t_sim *sim);
+
+/* sync.c — bandeira de fim e porta de partida */
+int		is_simulation_over(t_sim *sim);
+void	wait_gate(t_sim *sim);
+void	open_gate(t_sim *sim);
+
+/* coder.c — rotina dos coders, criar e esperar as threads */
+void	join_coders(t_sim *sim, int count);
+int		start_coders(t_sim *sim);
+
+/* monitor.c — vigiar burnouts e o fim por compilações */
+int		start_monitor(t_sim *sim);
+
 #endif

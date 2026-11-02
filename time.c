@@ -14,11 +14,11 @@ long	elapsed_ms(long start)
 }
 
 /* espera aos bocadinhos de 0,5 ms: o atraso final fica do tamanho de uma volta */
-void	precise_sleep(long ms)
+void	precise_sleep(t_sim *sim, long ms)
 {
 	long	start;
 
 	start = get_time_ms();
-	while (elapsed_ms(start) < ms)
+	while (elapsed_ms(start) < ms && !is_simulation_over(sim))
 		usleep(500);
 }

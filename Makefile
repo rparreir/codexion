@@ -3,13 +3,15 @@ NAME	= codexion
 CC		= cc
 CFLAGS	= -Wall -Wextra -Werror -pthread
 
-# os .c do projeto (debug.c é temporário)
+# os .c do projeto
 SRCS	= main.c \
 		  parsing.c \
 		  parsing_helpers.c \
-		  debug.c \
 		  time.c \
-		  sim.c
+		  sim.c \
+		  coder.c \
+		  monitor.c \
+		  sync.c
 
 OBJS	= $(SRCS:.c=.o)
 

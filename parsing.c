@@ -36,3 +36,15 @@ void	fill_config(char **argv, t_config *config)
 	else
 		config->scheduler = 1;
 }
+
+int	ends_before_start(t_config *config)
+{
+	if (config->number_of_compiles_required == 0)
+		return (1);
+	if (config->time_to_burnout == 0)
+	{
+		printf("0 1 burned out\n");
+		return (1);
+	}
+	return (0);
+}
