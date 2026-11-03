@@ -1,6 +1,5 @@
 #include "codexion.h"
 
-
 int	is_simulation_over(t_sim *sim)
 {
 	int	over;
@@ -23,7 +22,7 @@ void	wait_gate(t_sim *sim)
 
 void	open_gate(t_sim *sim)
 {
-	int i;
+	int	i;
 
 	pthread_mutex_lock(&sim->stop_mutex);
 	while (sim->ready < sim->config.number_of_coders)
@@ -33,11 +32,11 @@ void	open_gate(t_sim *sim)
 		pthread_mutex_lock(&sim->stop_mutex);
 	}
 	sim->start_time = get_time_ms();
-
 	i = 0;
 	while (i < sim->config.number_of_coders)
 	{
-		sim->coders[i].burnout_deadline = sim->start_time + sim->config.time_to_burnout;
+		sim->coders[i].burnout_deadline = sim->start_time
+			+ sim->config.time_to_burnout;
 		i++;
 	}
 	sim->started = 1;

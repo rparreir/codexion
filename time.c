@@ -1,4 +1,4 @@
-# include "codexion.h"
+#include "codexion.h"
 
 long	get_time_ms(void)
 {
@@ -13,7 +13,8 @@ long	elapsed_ms(long start)
 	return (get_time_ms() - start);
 }
 
-/* espera aos bocadinhos de 0,5 ms: o atraso final fica do tamanho de uma volta */
+/* espera aos bocadinhos de 0,5 ms:
+   o atraso final fica do tamanho de uma volta */
 void	precise_sleep(t_sim *sim, long ms)
 {
 	long	start;

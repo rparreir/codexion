@@ -1,6 +1,5 @@
 #include "codexion.h"
 
-
 void	*coder_routine(void *arg)
 {
 	t_coder	*coder;
@@ -54,8 +53,8 @@ int	start_coders(t_sim *sim)
 				i + 1);
 			pthread_mutex_lock(&sim->stop_mutex);
 			sim->simulation_over = 1;
-			sim->started = 1;                               
-			pthread_cond_broadcast(&sim->start_cond); 
+			sim->started = 1;
+			pthread_cond_broadcast(&sim->start_cond);
 			pthread_mutex_unlock(&sim->stop_mutex);
 			join_coders(sim, i);
 			return (0);

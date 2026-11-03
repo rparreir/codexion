@@ -1,6 +1,5 @@
 #include "codexion.h"
 
-
 int	check_arg_size(int argc)
 {
 	if (argc < 9)

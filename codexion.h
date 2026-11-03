@@ -21,7 +21,8 @@ typedef struct s_config
 	int		scheduler; /* 0 = fifo, 1 = edf */
 }	t_config;
 
-/* declaração antecipada: o t_coder aponta para a t_sim, e a t_sim tem os coders */
+/* declaração antecipada: o t_coder aponta para a t_sim,
+   e a t_sim tem os coders */
 typedef struct s_sim	t_sim;
 
 typedef struct s_coder
