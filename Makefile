@@ -35,4 +35,8 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re
+# testes automáticos: PASS/FAIL de cada teste e um resumo no fim
+test: $(NAME)
+	bash tests.sh
+
+.PHONY: all clean fclean re test

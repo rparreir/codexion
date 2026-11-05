@@ -1,5 +1,28 @@
 #include "codexion.h"
 
+int	init_sync(t_sim *sim)
+{
+	if (pthread_mutex_init(&sim->log_mutex, NULL) != 0)
+	{
+		fprintf(stderr, "Error: could not create the log mutex\n");
+		return (0);
+	}
+	if (pthread_mutex_init(&sim->stop_mutex, NULL) != 0)
+	{
+		fprintf(stderr, "Error: could not create the stop mutex\n");
+		pthread_mutex_destroy(&sim->log_mutex);
+		return (0);
+	}
+	if (pthread_cond_init(&sim->start_cond, NULL) != 0)
+	{
+		fprintf(stderr, "Error: could not create the start condition\n");
+		pthread_mutex_destroy(&sim->stop_mutex);
+		pthread_mutex_destroy(&sim->log_mutex);
+		return (0);
+	}
+	return (1);
+}
+
 int	is_simulation_over(t_sim *sim)
 {
 	int	over;

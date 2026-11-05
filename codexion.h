@@ -72,12 +72,14 @@ int		init_sim(t_sim *sim, t_config *config);
 void	print_status(t_coder *coder, char *message);
 void	free_sim(t_sim *sim);
 
-/* sync.c — bandeira de fim e porta de partida */
+/* sync.c — criar os mutexes e a cond, bandeira de fim, porta de partida */
+int		init_sync(t_sim *sim);
 int		is_simulation_over(t_sim *sim);
 void	wait_gate(t_sim *sim);
 void	open_gate(t_sim *sim);
 
-/* coder.c — rotina dos coders, criar e esperar as threads */
+/* coder.c — criar os coders, a rotina, criar e esperar as threads */
+void	init_coders(t_sim *sim);
 void	join_coders(t_sim *sim, int count);
 int		start_coders(t_sim *sim);
 

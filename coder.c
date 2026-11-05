@@ -1,5 +1,21 @@
 #include "codexion.h"
 
+void	init_coders(t_sim *sim)
+{
+	int	i;
+
+	i = 0;
+	while (i < sim->config.number_of_coders)
+	{
+		sim->coders[i].id = i + 1;
+		sim->coders[i].compiles_done = 0;
+		sim->coders[i].burnout_deadline = sim->start_time
+			+ sim->config.time_to_burnout;
+		sim->coders[i].shared = sim;
+		i++;
+	}
+}
+
 void	*coder_routine(void *arg)
 {
 	t_coder	*coder;

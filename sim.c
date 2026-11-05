@@ -1,44 +1,5 @@
 #include "codexion.h"
 
-void	init_coders(t_sim *sim)
-{
-	int	i;
-
-	i = 0;
-	while (i < sim->config.number_of_coders)
-	{
-		sim->coders[i].id = i + 1;
-		sim->coders[i].compiles_done = 0;
-		sim->coders[i].burnout_deadline = sim->start_time
-			+ sim->config.time_to_burnout;
-		sim->coders[i].shared = sim;
-		i++;
-	}
-}
-
-int	init_sync(t_sim *sim)
-{
-	if (pthread_mutex_init(&sim->log_mutex, NULL) != 0)
-	{
-		fprintf(stderr, "Error: could not create the log mutex\n");
-		return (0);
-	}
-	if (pthread_mutex_init(&sim->stop_mutex, NULL) != 0)
-	{
-		fprintf(stderr, "Error: could not create the stop mutex\n");
-		pthread_mutex_destroy(&sim->log_mutex);
-		return (0);
-	}
-	if (pthread_cond_init(&sim->start_cond, NULL) != 0)
-	{
-		fprintf(stderr, "Error: could not create the start condition\n");
-		pthread_mutex_destroy(&sim->stop_mutex);
-		pthread_mutex_destroy(&sim->log_mutex);
-		return (0);
-	}
-	return (1);
-}
-
 int	init_sim(t_sim *sim, t_config *config)
 {
 	sim->config = *config;
