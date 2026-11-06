@@ -1,5 +1,6 @@
 #!/bin/bash
-# Testes automáticos do codexion (100 testes). Correr com: make test
+# Testes automáticos do codexion. Correr com: make test
+# Começou com 100 testes; vão-se juntando os de cada tick (fases 4 e 5).
 # Cada teste escreve PASS (verde), FAIL (vermelho) ou SKIP (amarelo, quando falta
 # uma ferramenta). No fim aparece o resumo; o script sai com 1 se houver falhas.
 # Os testes marcados "sem dongles" valem para o modelo da fase 3 e são revistos na
@@ -277,29 +278,55 @@ fi
 note "(20 corridas com 200 coders, cerca de 1 min...)"
 burned=0
 hung=0
+first=""
 for i in $(seq 1 20); do
 	timeout 15 "$BIN" 200 800 200 200 200 3 10 fifo >"$TMP/rep" 2>/dev/null
 	[ $? -eq 124 ] && hung=$((hung + 1))
-	grep -q 'burned out$' "$TMP/rep" && burned=$((burned + 1))
+	if grep -q 'burned out$' "$TMP/rep"; then
+		burned=$((burned + 1))
+		[ -z "$first" ] && first="1.ª (corrida $i): \"$(grep -m 1 'burned out$' "$TMP/rep")\""
+	fi
 done
 if [ "$hung" -eq 0 ]; then pass "200 coders × 20: nunca pendura"; else fail "200 coders × 20: nunca pendura" "pendurou em $hung de 20"; fi
-if [ "$burned" -eq 0 ]; then pass "200 coders × 20: nenhum burnout falso"; else fail "200 coders × 20: nenhum burnout falso" "burnout em $burned de 20 corridas"; fi
+if [ "$burned" -eq 0 ]; then pass "200 coders × 20: nenhum burnout falso"; else fail "200 coders × 20: nenhum burnout falso" "burnout em $burned de 20 corridas · $first"; fi
 
 wrong=0
+first=""
 for i in $(seq 1 20); do
 	timeout 15 "$BIN" 4 310 200 100 100 5 0 fifo >"$TMP/rep" 2>/dev/null
 	nb=$(grep -c 'burned out$' "$TMP/rep")
 	t=$(tail -n 1 "$TMP/rep" | awk '/burned out$/ { print $1 }')
-	if [ "$nb" -ne 1 ] || [ -z "$t" ] || [ "$t" -lt 310 ] || [ "$t" -gt 320 ]; then wrong=$((wrong + 1)); fi
+	if [ "$nb" -ne 1 ] || [ -z "$t" ] || [ "$t" -lt 310 ] || [ "$t" -gt 320 ]; then
+		wrong=$((wrong + 1))
+		[ -z "$first" ] && first="1.ª errada (corrida $i): $nb burned out, última linha \"$(tail -n 1 "$TMP/rep")\""
+	fi
 done
 if [ "$wrong" -eq 0 ]; then
 	pass "burnout × 20 (4 310 200 100 100): sempre um só, na última linha, entre 310 e 320 ms"
 else
-	fail "burnout × 20 (4 310 200 100 100): sempre um só, na última linha, entre 310 e 320 ms" "errado em $wrong de 20 corridas"
+	fail "burnout × 20 (4 310 200 100 100): sempre um só, na última linha, entre 310 e 320 ms" "errado em $wrong de 20 corridas · $first"
 fi
 
 # ---------------------------------------------------------------------------
-section "12. ThreadSanitizer (data races e inversões de mutex)"
+section "12. Casos encontrados pelos colegas"
+run 1 1000 100 100 100 5 1 edf
+first=$(head -n 1 "$TMP/out")
+last=$(tail -n 1 "$TMP/out")
+t=$(echo "$last" | awk '/ 1 burned out$/ { print $1 }')
+if [ "$CODE" -eq 0 ] && [ "$(wc -l <"$TMP/out")" -eq 2 ] && [ "$first" = "0 1 has taken a dongle" ] \
+	&& [ -n "$t" ] && [ "$t" -ge 1000 ] && [ "$t" -le 1010 ]; then
+	pass "1 1000 100 100 100 5 1 edf: 1 coder pega no único dongle e faz burnout aos $t ms"
+else
+	fail "1 1000 100 100 100 5 1 edf: só \"0 1 has taken a dongle\" e burnout entre 1000 e 1010 ms (passa depois do f4-t2)" \
+		"saída $CODE, $(wc -l <"$TMP/out") linhas, 1.ª \"$first\", última \"$last\""
+fi
+# um dos dois tem de esperar pelo cooldown (até aos 2 ms), e o seu prazo acaba ao 1 ms
+expect_burnout "2 1 1 1 1 1 1 edf: um só burnout, quase imediato (passa depois do f4-t3)" 1 2 1 1 1 1 1 1 edf
+# o cooldown aperta: o último compile começa aos 600 e o prazo é 650 (folga de 50 ms)
+expect_survive "4 450 100 100 100 2 100 edf: o cooldown aperta, mas há folga → sem burnout" 4 450 100 100 100 2 100 edf
+
+# ---------------------------------------------------------------------------
+section "13. ThreadSanitizer (data races e inversões de mutex)"
 if cc -Wall -Wextra -Werror -pthread -fsanitize=thread -g ./*.c -o "$TMP/codexion_tsan" 2>"$TMP/tsan_build"; then
 	PREFIX=""
 	command -v setarch >/dev/null && PREFIX="setarch $(uname -m) -R"
@@ -318,7 +345,7 @@ else
 	for i in 1 2 3; do skip "ThreadSanitizer" "não compilou com -fsanitize=thread"; done
 fi
 
-section "13. Valgrind (leaks e erros de memória)"
+section "14. Valgrind (leaks e erros de memória)"
 for args in "3 800 200 200 200 2 10 fifo" "2 800 100 300 500 2 10 fifo" "3 800 200 200 200 0 10 fifo" "3 0 200 200 200 3 10 fifo" "3 80a 200 200 200 3 10 fifo"; do
 	if command -v valgrind >/dev/null; then
 		# shellcheck disable=SC2086

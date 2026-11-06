@@ -66,3 +66,10 @@ void	open_gate(t_sim *sim)
 	pthread_cond_broadcast(&sim->start_cond);
 	pthread_mutex_unlock(&sim->stop_mutex);
 }
+
+void	destroy_sync(t_sim *sim)
+{
+	pthread_cond_destroy(&sim->start_cond);
+	pthread_mutex_destroy(&sim->stop_mutex);
+	pthread_mutex_destroy(&sim->log_mutex);
+}

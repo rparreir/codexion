@@ -11,13 +11,18 @@ SRCS	= main.c \
 		  sim.c \
 		  coder.c \
 		  monitor.c \
-		  sync.c
+		  sync.c \
+		  dongle.c
 
 OBJS	= $(SRCS:.c=.o)
 
 HEADER	= codexion.h
 
+
+
 all: $(NAME)
+	./codexion 3 800 100 100 100 5 0 fifo
+	make clean
 
 # só volta a linkar se algum .o for mais recente que o executável
 $(NAME): $(OBJS)

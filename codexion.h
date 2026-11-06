@@ -25,6 +25,14 @@ typedef struct s_config
    e a t_sim tem os coders */
 typedef struct s_sim	t_sim;
 
+typedef struct s_dongle
+{
+	pthread_mutex_t	mutex;
+	int				id;
+	int				taken;
+	long			available_at;
+}	t_dongle;
+
 typedef struct s_coder
 {
 	int			id;
@@ -32,6 +40,8 @@ typedef struct s_coder
 	int			compiles_done;
 	pthread_t	thread;
 	t_sim		*shared;
+	t_dongle	*left;
+	t_dongle	*right;
 }	t_coder;
 
 struct s_sim
@@ -46,7 +56,10 @@ struct s_sim
 	int				started;
 	pthread_cond_t	start_cond;
 	int				ready;
+	t_dongle		*dongles;
 };
+
+
 
 /* protótipos das funções usadas fora do seu ficheiro; as funções locais
    (só usadas dentro do próprio .c) não estão aqui */
@@ -77,6 +90,11 @@ int		init_sync(t_sim *sim);
 int		is_simulation_over(t_sim *sim);
 void	wait_gate(t_sim *sim);
 void	open_gate(t_sim *sim);
+void	destroy_sync(t_sim *sim);
+
+/* dongle.c — criar e destruir os dongles */
+int		init_dongles(t_sim *sim);
+void	destroy_dongles(t_sim *sim, int count);
 
 /* coder.c — criar os coders, a rotina, criar e esperar as threads */
 void	init_coders(t_sim *sim);
