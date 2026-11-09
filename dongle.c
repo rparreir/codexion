@@ -42,3 +42,60 @@ void	destroy_dongles(t_sim *sim, int count)
 	}
 	free(sim->dongles);
 }
+
+int	take_dongle(t_coder *coder, t_dongle *dongle)
+{
+	t_sim	*sim;
+
+	sim = coder->shared;
+	while (1)
+	{
+		if (is_simulation_over(sim))
+			return (0);
+		pthread_mutex_lock (&dongle->mutex);
+		if (dongle->taken == 0)
+		{
+			dongle->taken = 1;
+			pthread_mutex_unlock (&dongle->mutex);
+			print_status(coder, "has taken a dongle");
+			return (1);
+		}
+		else
+		{
+			pthread_mutex_unlock (&dongle->mutex);
+		}
+		usleep(500);
+	}
+}
+
+void	release_dongle(t_dongle *dongle)
+{
+	pthread_mutex_lock (&dongle->mutex);
+	dongle->taken = 0;
+	pthread_mutex_unlock (&dongle->mutex);
+}
+
+int	take_dongles(t_coder *coder)
+{
+	t_dongle	*first;
+	t_dongle	*second;
+
+	if (coder->id % 2 == 0)
+	{
+		first = coder->left;
+		second = coder->right;
+	}
+	else
+	{
+		first = coder->right;
+		second = coder->left;
+	}
+	if (!take_dongle(coder, first))
+		return (0);
+	if (!take_dongle(coder, second))
+	{
+		release_dongle(first);
+		return (0);
+	}
+	return (1);
+}

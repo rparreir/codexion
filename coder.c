@@ -20,6 +20,23 @@ void	init_coders(t_sim *sim)
 	}
 }
 
+/* compila com os dois dongles na mão */
+void	compile(t_coder *coder)
+{
+	t_sim	*sim;
+
+	sim = coder->shared;
+	pthread_mutex_lock(&sim->stop_mutex);
+	coder->burnout_deadline = get_time_ms() + sim->config.time_to_burnout;
+	pthread_mutex_unlock(&sim->stop_mutex);
+	print_status(coder, "is compiling");
+	precise_sleep(sim, sim->config.time_to_compile);
+	pthread_mutex_lock(&sim->stop_mutex);
+	coder->compiles_done++;
+	pthread_mutex_unlock(&sim->stop_mutex);
+	
+}
+
 void	*coder_routine(void *arg)
 {
 	t_coder	*coder;
@@ -30,15 +47,12 @@ void	*coder_routine(void *arg)
 	wait_gate(sim);
 	while (!is_simulation_over(sim))
 	{
-		pthread_mutex_lock(&sim->stop_mutex);
-		coder->burnout_deadline = get_time_ms() + sim->config.time_to_burnout;
-		pthread_mutex_unlock(&sim->stop_mutex);
-		print_status(coder, "is compiling");
-		precise_sleep(sim, sim->config.time_to_compile);
-		pthread_mutex_lock(&sim->stop_mutex);
-		coder->compiles_done++;
-		pthread_mutex_unlock(&sim->stop_mutex);
+		if (!take_dongles(coder))
+			return (NULL);
+		compile(coder);
 		print_status(coder, "is debugging");
+		release_dongle(coder->left);
+		release_dongle(coder->right);
 		precise_sleep(sim, sim->config.time_to_debug);
 		print_status(coder, "is refactoring");
 		precise_sleep(sim, sim->config.time_to_refactor);

@@ -180,6 +180,9 @@ expect_silent "burnout 0 e 0 compilações → ganham as compilações (nada)" 3
 # ---------------------------------------------------------------------------
 section "8. Tem de dar burnout, a tempo (entre B e B + 10 ms)"
 expect_burnout "1 coder, ciclo 400 > burnout 300" 300 1 300 100 100 200 5 0 fifo
+# Era um teste "sem burnout" da fase 3. Com 1 coder há 1 dongle: o coder nunca
+# compila, e o subject pede burnout, mesmo com o ciclo (600) abaixo do prazo (610).
+expect_burnout "1 coder: um só dongle, nunca compila (ciclo 600 < burnout 610)" 610 1 610 200 200 200 3 0 fifo
 expect_burnout "2 coders, ciclo 500 > 410" 410 2 410 200 200 100 5 0 fifo
 expect_burnout "compile (200) maior que o burnout (100)" 100 3 100 200 100 100 3 0 fifo
 expect_burnout "clássico: 4 310 200 100 100" 310 4 310 200 100 100 5 0 fifo
@@ -195,7 +198,6 @@ expect_burnout "com cooldown: 1 300 100 100 200, cooldown 50" 300 1 300 100 100 
 expect_burnout "compilações = INT_MAX (só pára por burnout)" 300 3 300 200 200 200 2147483647 0 fifo
 
 section "9. Margens apertadas, sem burnout (sem dongles; rever na fase 4)"
-expect_survive "1 coder, ciclo 600, burnout 610 (margem 10 ms)" 1 610 200 200 200 3 0 fifo
 expect_survive "clássico: 4 410 200 100 100" 4 410 200 100 100 5 0 fifo
 expect_survive "5 coders: 5 800 200 200 200" 5 800 200 200 200 3 0 fifo
 expect_survive "200 coders com margem de 10 ms" 200 610 200 200 200 3 0 fifo
@@ -251,17 +253,18 @@ if [ -z "$miss" ]; then pass "todos os 7 coders aparecem nos logs"; else fail "t
 
 # ---------------------------------------------------------------------------
 section "11. Pendentes da fase 3 e repetições (os erros que só aparecem às vezes)"
+# O subject não fixa a hora do arranque. Este teste guarda a porta de partida
+# (decisão 9 da fase 3): sem ela, os coders arrancavam 2–20 ms atrasados.
+# Com dongles, só alguns coders começam logo (os outros esperam pelos vizinhos),
+# por isso vê-se só a 1.ª linha da simulação. Aceita o ms 1: se o tiro cair no fim
+# de um ms, um coder que acorde 0,1 ms depois já está no ms seguinte (o relógio
+# corta os µs).
 run 5 800 200 200 200 1 0 fifo
-spread=$(awk '!seen[$2]++ { print $1 }' "$TMP/out" | sort -n | awk 'NR == 1 { lo = $1 } { hi = $1 } END { print lo " " hi }')
-lo=${spread% *}
-hi=${spread#* }
-# aceita o ms 1: se o tiro cair no fim de um ms, um coder que acorde 0,1 ms depois
-# já está no ms seguinte (o relógio corta os µs). O problema a apanhar é outro:
-# coders a arrancar com 2 ou mais ms de diferença.
-if [[ "$lo" =~ ^[0-9]+$ ]] && [[ "$hi" =~ ^[0-9]+$ ]] && [ "$hi" -le 1 ]; then
-	pass "arranque junto: o 1.º log dos 5 coders sai no ms 0 ou 1 (saíram entre os $lo e os $hi ms; sem dongles)"
+first_ms=$(awk 'NR == 1 { print $1 }' "$TMP/out")
+if [[ "$first_ms" =~ ^[0-9]+$ ]] && [ "$first_ms" -le 1 ]; then
+	pass "arranque: a 1.ª linha da simulação sai no ms 0 ou 1 (saiu no ms $first_ms)"
 else
-	fail "arranque junto: o 1.º log dos 5 coders sai no ms 0 ou 1 (sem dongles)" "os primeiros logs saíram entre os $lo e os $hi ms"
+	fail "arranque: a 1.ª linha da simulação sai no ms 0 ou 1" "saiu no ms ${first_ms:-?}"
 fi
 
 run 2 100000 200 200 200 5 0 fifo
@@ -313,11 +316,13 @@ run 1 1000 100 100 100 5 1 edf
 first=$(head -n 1 "$TMP/out")
 last=$(tail -n 1 "$TMP/out")
 t=$(echo "$last" | awk '/ 1 burned out$/ { print $1 }')
-if [ "$CODE" -eq 0 ] && [ "$(wc -l <"$TMP/out")" -eq 2 ] && [ "$first" = "0 1 has taken a dongle" ] \
+# aceita o "has taken" no ms 0 ou 1, pela mesma razão do teste do arranque (secção 11)
+if [ "$CODE" -eq 0 ] && [ "$(wc -l <"$TMP/out")" -eq 2 ] \
+	&& { [ "$first" = "0 1 has taken a dongle" ] || [ "$first" = "1 1 has taken a dongle" ]; } \
 	&& [ -n "$t" ] && [ "$t" -ge 1000 ] && [ "$t" -le 1010 ]; then
 	pass "1 1000 100 100 100 5 1 edf: 1 coder pega no único dongle e faz burnout aos $t ms"
 else
-	fail "1 1000 100 100 100 5 1 edf: só \"0 1 has taken a dongle\" e burnout entre 1000 e 1010 ms (passa depois do f4-t2)" \
+	fail "1 1000 100 100 100 5 1 edf: só \"has taken a dongle\" (ms 0 ou 1) e burnout entre 1000 e 1010 ms" \
 		"saída $CODE, $(wc -l <"$TMP/out") linhas, 1.ª \"$first\", última \"$last\""
 fi
 # um dos dois tem de esperar pelo cooldown (até aos 2 ms), e o seu prazo acaba ao 1 ms
@@ -361,6 +366,113 @@ for args in "3 800 200 200 200 2 10 fifo" "2 800 100 300 500 2 10 fifo" "3 800 2
 		skip "valgrind com $args" "o valgrind não está instalado"
 	fi
 done
+
+section "15. Dongles (fase 4)"
+note "(6 casos, 3 corridas cada, cerca de 1 min...)"
+# Os dois testes leem os mesmos logs.
+# - dois dongles: cada "is compiling" de um coder vem depois de exatamente dois
+#   "has taken a dongle" desse coder, desde o compile anterior.
+# - vizinhos: o compile de um coder vai do seu "is compiling" até + time_to_compile.
+#   Dois vizinhos (i e i + 1, e o último com o 1.º) não se podem sobrepor. Uma
+#   sobreposição até 2 ms é arredondamento dos ms; uma a sério dura um compile.
+# - ordem do log: a regra do visualizador dos colegas
+#   (codexion-visualizer.sacha-dev.me). Um coder segura os dongles desde cada
+#   "has taken a dongle" até ao seu "is debugging". Lendo o log por ordem, um coder
+#   não pode apanhar um dongle que o vizinho ainda segura (vizinho com 2).
+bad_two=""
+bad_nb=""
+bad_lo=""
+for args in "2 800 100 100 100 5 0 fifo" "3 800 200 200 200 5 0 fifo" \
+	"4 410 200 100 100 5 0 fifo" "5 800 200 200 200 5 0 fifo" \
+	"8 800 150 200 125 8 0 fifo" "200 800 200 200 200 3 0 fifo"; do
+	n=${args%% *}
+	c=$(echo "$args" | cut -d ' ' -f 3)
+	for k in 1 2 3; do
+		# shellcheck disable=SC2086
+		timeout 15 "$BIN" $args >"$TMP/dg" 2>/dev/null
+		if [ -z "$bad_two" ]; then
+			r=$(awk '
+				$3 == "has" { t[$2]++
+					if (t[$2] > 2) { print "linha " NR ": o coder " $2 " apanhou 3 dongles sem compilar"; exit } }
+				$3 == "is" && $4 == "compiling" {
+					if (t[$2] != 2) { print "linha " NR ": o coder " $2 " compilou com " t[$2] + 0 " dongle(s)"; exit }
+					t[$2] = 0 }' "$TMP/dg")
+			[ -n "$r" ] && bad_two="$args · $r"
+		fi
+		if [ -z "$bad_nb" ]; then
+			r=$(awk -v n="$n" -v c="$c" '
+				$3 == "is" && $4 == "compiling" { s[$2, ++cnt[$2]] = $1 }
+				END {
+					for (i = 1; i <= n; i++) {
+						j = i % n + 1
+						if (j == i) continue
+						for (a = 1; a <= cnt[i]; a++) for (b = 1; b <= cnt[j]; b++) {
+							lo = s[i, a] > s[j, b] ? s[i, a] : s[j, b]
+							hi = s[i, a] < s[j, b] ? s[i, a] + c : s[j, b] + c
+							if (hi - lo > 2) {
+								printf "os coders %d e %d compilaram ao mesmo tempo (desde os %d e os %d ms)\n", i, j, s[i, a], s[j, b]
+								exit
+							}
+						}
+					}
+				}' "$TMP/dg")
+			[ -n "$r" ] && bad_nb="$args · $r"
+		fi
+		if [ -z "$bad_lo" ]; then
+			r=$(awk -v n="$n" '
+				$3 == "has" {
+					x = $2; h[x]++
+					l = (x == 1) ? n : x - 1; r = (x == n) ? 1 : x + 1
+					if (n == 2) bad = (h[x] + h[l] > 2)
+					else bad = (h[l] == 2 && h[r] == 2) || (h[x] == 2 && (h[l] == 2 || h[r] == 2))
+					if (bad) {
+						printf "linha %d: \"%s\", com o coder %d a segurar %d e o coder %d a segurar %d\n", NR, $0, l, h[l], r, h[r]
+						exit
+					}
+				}
+				$3 == "is" && $4 == "debugging" { h[$2] = 0 }' "$TMP/dg")
+			[ -n "$r" ] && bad_lo="$args · $r"
+		fi
+	done
+done
+if [ -z "$bad_two" ]; then pass "antes de cada \"is compiling\", dois \"has taken a dongle\" desse coder"; else fail "antes de cada \"is compiling\", dois \"has taken a dongle\" desse coder" "$bad_two"; fi
+if [ -z "$bad_nb" ]; then pass "dois vizinhos nunca compilam ao mesmo tempo"; else fail "dois vizinhos nunca compilam ao mesmo tempo" "$bad_nb"; fi
+if [ -z "$bad_lo" ]; then pass "na ordem do log, ninguém apanha um dongle antes de o vizinho escrever \"is debugging\""; else fail "na ordem do log, ninguém apanha um dongle antes de o vizinho escrever \"is debugging\"" "$bad_lo"; fi
+
+section "16. Primeira volta: que dongles apanha cada coder (só para ver, não conta)"
+# Corre uma cópia que escreve também o número do dongle ("has taken dongle 3").
+# O programa a sério não muda. Prazo de 2000 ms para todos chegarem ao 1.º compile.
+# O resultado muda de corrida para corrida: quem espreita primeiro ganha.
+args="5 2000 200 200 200 1 0 fifo"
+mkdir -p "$TMP/volta"
+cp ./*.c ./*.h "$TMP/volta/"
+sed -i 's/print_status(coder, "has taken a dongle");/{ char m[32]; snprintf(m, sizeof(m), "has taken dongle %d", dongle->id); print_status(coder, m); }/' "$TMP/volta/dongle.c"
+if grep -q 'has taken dongle %d' "$TMP/volta/dongle.c" \
+	&& cc -pthread "$TMP"/volta/*.c -o "$TMP/volta/cx" 2>/dev/null; then
+	# shellcheck disable=SC2086
+	timeout 15 "$TMP/volta/cx" $args >"$TMP/volta/out" 2>/dev/null
+	note "$args"
+	note ""
+	awk -v n="${args%% *}" '
+		$3 == "has" && $5 == "dongle" && cnt[$2] < 2 {
+			cnt[$2]++; d[$2, cnt[$2]] = $6; t[$2, cnt[$2]] = $1
+		}
+		$3 == "is" && $4 == "compiling" && !($2 in c) { c[$2] = $1 }
+		END {
+			for (i = 1; i <= n; i++) {
+				line = sprintf("C%-3d", i)
+				if (cnt[i] >= 1) line = line sprintf("1.º D%-2s aos %4d ms", d[i, 1], t[i, 1])
+				if (cnt[i] >= 2) line = line sprintf("  ·  2.º D%-2s aos %4d ms", d[i, 2], t[i, 2])
+				if (i in c) line = line sprintf("  →  compila aos %4d ms", c[i])
+				else line = line "  →  não chegou a compilar"
+				if (cnt[i] >= 2 && t[i, 2] - t[i, 1] > 1)
+					line = line sprintf("   (segurou o D%s %d ms à espera do D%s)", d[i, 1], t[i, 2] - t[i, 1], d[i, 2])
+				print line
+			}
+		}' "$TMP/volta/out" | while IFS= read -r line; do note "$line"; done
+else
+	note "não deu para fazer a cópia: o log \"has taken a dongle\" do dongle.c mudou?"
+fi
 
 # ---------------------------------------------------------------------------
 printf "\n%s==========================================================%s\n" "$BOLD" "$RESET"
