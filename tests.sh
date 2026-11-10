@@ -3,8 +3,8 @@
 # Começou com 100 testes; vão-se juntando os de cada tick (fases 4 e 5).
 # Cada teste escreve PASS (verde), FAIL (vermelho) ou SKIP (amarelo, quando falta
 # uma ferramenta). No fim aparece o resumo; o script sai com 1 se houver falhas.
-# Os testes marcados "sem dongles" valem para o modelo da fase 3 e são revistos na
-# fase 4 (com dongles, quem espera pelos vizinhos tem outros tempos).
+# Os testes da secção 9 (margens de 10 ms sem burnout) podem falhar às vezes até à
+# fase 5: sem ordem justa (fifo/edf), quem espreita primeiro ganha.
 
 cd "$(dirname "$0")" || exit 1
 BIN=./codexion
@@ -197,7 +197,7 @@ expect_burnout "edf: 3 500 100 450 50" 500 3 500 100 450 50 3 0 edf
 expect_burnout "com cooldown: 1 300 100 100 200, cooldown 50" 300 1 300 100 100 200 5 50 fifo
 expect_burnout "compilações = INT_MAX (só pára por burnout)" 300 3 300 200 200 200 2147483647 0 fifo
 
-section "9. Margens apertadas, sem burnout (sem dongles; rever na fase 4)"
+section "9. Margens apertadas, sem burnout (só garantidas na fase 5, com fifo/edf)"
 expect_survive "clássico: 4 410 200 100 100" 4 410 200 100 100 5 0 fifo
 expect_survive "5 coders: 5 800 200 200 200" 5 800 200 200 200 3 0 fifo
 expect_survive "200 coders com margem de 10 ms" 200 610 200 200 200 3 0 fifo
@@ -439,18 +439,79 @@ if [ -z "$bad_two" ]; then pass "antes de cada \"is compiling\", dois \"has take
 if [ -z "$bad_nb" ]; then pass "dois vizinhos nunca compilam ao mesmo tempo"; else fail "dois vizinhos nunca compilam ao mesmo tempo" "$bad_nb"; fi
 if [ -z "$bad_lo" ]; then pass "na ordem do log, ninguém apanha um dongle antes de o vizinho escrever \"is debugging\""; else fail "na ordem do log, ninguém apanha um dongle antes de o vizinho escrever \"is debugging\"" "$bad_lo"; fi
 
-section "16. Primeira volta: que dongles apanha cada coder (só para ver, não conta)"
-# Corre uma cópia que escreve também o número do dongle ("has taken dongle 3").
-# O programa a sério não muda. Prazo de 2000 ms para todos chegarem ao 1.º compile.
-# O resultado muda de corrida para corrida: quem espreita primeiro ganha.
-args="5 2000 200 200 200 1 0 fifo"
+# Cópia que escreve também o número do dongle ("has taken dongle 3"), para as
+# secções 16 e 17. O programa a sério não muda.
 mkdir -p "$TMP/volta"
 cp ./*.c ./*.h "$TMP/volta/"
 sed -i 's/print_status(coder, "has taken a dongle");/{ char m[32]; snprintf(m, sizeof(m), "has taken dongle %d", dongle->id); print_status(coder, m); }/' "$TMP/volta/dongle.c"
+IDS=""
 if grep -q 'has taken dongle %d' "$TMP/volta/dongle.c" \
 	&& cc -pthread "$TMP"/volta/*.c -o "$TMP/volta/cx" 2>/dev/null; then
+	IDS="$TMP/volta/cx"
+fi
+
+section "16. Cooldown (fase 4)"
+# Regra do subject: depois de largado, um dongle fica dongle_cooldown ms sem poder
+# ser apanhado. "Largado" = a linha "is debugging" de quem o tinha (é também a regra
+# do visualizador dos colegas). Com 2 coders, os dois começam pelo mesmo dongle, por
+# isso quem perde só apanha alguma coisa depois de o outro largar.
+cool_gap()
+{
+	timeout 15 "$BIN" "$@" >"$TMP/cd" 2>/dev/null
+	awk '$3 == "is" && $4 == "debugging" && a == "" { a = $2; r = $1 }
+		$3 == "has" && a != "" && $2 != a { print $1 - r; exit }' "$TMP/cd"
+}
+g=$(cool_gap 2 1000 100 100 100 3 50 fifo)
+if [[ "$g" =~ ^[0-9]+$ ]] && [ "$g" -ge 50 ] && [ "$g" -le 60 ]; then
+	pass "cooldown 50: o vizinho apanha o dongle 50 a 60 ms depois de largado ($g ms)"
+else
+	fail "cooldown 50: o vizinho apanha o dongle 50 a 60 ms depois de largado" "passaram ${g:-?} ms"
+fi
+g=$(cool_gap 2 1000 100 100 100 3 0 fifo)
+if [[ "$g" =~ ^[0-9]+$ ]] && [ "$g" -le 10 ]; then
+	pass "cooldown 0: o vizinho apanha o dongle logo ($g ms)"
+else
+	fail "cooldown 0: o vizinho apanha o dongle logo" "passaram ${g:-?} ms"
+fi
+# o dongle só volta aos 600, mas os prazos acabam aos 300
+expect_burnout "cooldown 500 maior que a folga: 2 300 100 100 100 3 500" 300 2 300 100 100 100 3 500 fifo
+if [ -n "$IDS" ]; then
+	bad_cd=""
+	for args in "9 547 212 79 136 4 41 edf" "4 1000 100 100 100 5 400 edf" \
+		"5 800 200 100 100 5 50 fifo" "200 1000 100 100 100 3 10 edf"; do
+		cd_ms=$(echo "$args" | cut -d ' ' -f 7)
+		for k in 1 2 3; do
+			[ -n "$bad_cd" ] && break
+			# shellcheck disable=SC2086
+			timeout 15 "$IDS" $args >"$TMP/cd" 2>/dev/null
+			r=$(awk -v cd="$cd_ms" '
+				$3 == "has" && $5 == "dongle" {
+					if (($6 in rel) && $1 < rel[$6] + cd) {
+						printf "linha %d: o coder %d apanhou o D%d aos %d ms; foi largado aos %d, só podia aos %d\n", NR, $2, $6, $1, rel[$6], rel[$6] + cd
+						exit
+					}
+					held[$2] = held[$2] " " $6
+				}
+				$3 == "is" && $4 == "debugging" {
+					k = split(held[$2], a, " ")
+					for (i = 1; i <= k; i++) rel[a[i]] = $1
+					held[$2] = ""
+				}' "$TMP/cd")
+			[ -n "$r" ] && bad_cd="$args · $r"
+		done
+	done
+	if [ -z "$bad_cd" ]; then pass "nenhum dongle é apanhado antes de largado + cooldown (4 casos × 3)"; else fail "nenhum dongle é apanhado antes de largado + cooldown" "$bad_cd"; fi
+else
+	skip "nenhum dongle é apanhado antes de largado + cooldown" "não deu para fazer a cópia com o número do dongle"
+fi
+
+section "17. Primeira volta: que dongles apanha cada coder (só para ver, não conta)"
+# Usa a cópia com o número do dongle. Prazo de 2000 ms para todos chegarem ao 1.º
+# compile. O resultado muda de corrida para corrida: quem espreita primeiro ganha.
+args="5 2000 200 200 200 1 0 fifo"
+if [ -n "$IDS" ]; then
 	# shellcheck disable=SC2086
-	timeout 15 "$TMP/volta/cx" $args >"$TMP/volta/out" 2>/dev/null
+	timeout 15 "$IDS" $args >"$TMP/volta/out" 2>/dev/null
 	note "$args"
 	note ""
 	awk -v n="${args%% *}" '

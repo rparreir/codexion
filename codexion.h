@@ -95,7 +95,7 @@ void	destroy_sync(t_sim *sim);
 /* dongle.c — criar e destruir os dongles */
 int		init_dongles(t_sim *sim);
 void	destroy_dongles(t_sim *sim, int count);
-void	release_dongle(t_dongle *dongle);
+void	release_dongle(t_coder *coder, t_dongle *dongle);
 int		take_dongles(t_coder *coder);
 
 /* coder.c — criar os coders, a rotina, criar e esperar as threads */

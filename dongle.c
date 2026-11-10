@@ -53,7 +53,7 @@ int	take_dongle(t_coder *coder, t_dongle *dongle)
 		if (is_simulation_over(sim))
 			return (0);
 		pthread_mutex_lock (&dongle->mutex);
-		if (dongle->taken == 0)
+		if (dongle->taken == 0 && get_time_ms() >= dongle->available_at)
 		{
 			dongle->taken = 1;
 			pthread_mutex_unlock (&dongle->mutex);
@@ -68,10 +68,14 @@ int	take_dongle(t_coder *coder, t_dongle *dongle)
 	}
 }
 
-void	release_dongle(t_dongle *dongle)
+void	release_dongle(t_coder *coder, t_dongle *dongle)
 {
+	t_sim	*sim;
+
+	sim = coder->shared;
 	pthread_mutex_lock (&dongle->mutex);
 	dongle->taken = 0;
+	dongle->available_at = get_time_ms() + sim->config.dongle_cooldown;
 	pthread_mutex_unlock (&dongle->mutex);
 }
 
@@ -94,7 +98,7 @@ int	take_dongles(t_coder *coder)
 		return (0);
 	if (!take_dongle(coder, second))
 	{
-		release_dongle(first);
+		release_dongle(coder, first);
 		return (0);
 	}
 	return (1);

@@ -51,8 +51,8 @@ void	*coder_routine(void *arg)
 			return (NULL);
 		compile(coder);
 		print_status(coder, "is debugging");
-		release_dongle(coder->left);
-		release_dongle(coder->right);
+		release_dongle(coder, coder->left);
+		release_dongle(coder, coder->right);
 		precise_sleep(sim, sim->config.time_to_debug);
 		print_status(coder, "is refactoring");
 		precise_sleep(sim, sim->config.time_to_refactor);
