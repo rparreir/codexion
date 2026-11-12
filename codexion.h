@@ -79,8 +79,6 @@ struct s_sim
 	t_dongle		*dongles;
 };
 
-
-
 /* protótipos das funções usadas fora do seu ficheiro; as funções locais
    (só usadas dentro do próprio .c) não estão aqui */
 
@@ -126,11 +124,11 @@ int		start_coders(t_sim *sim);
 /* monitor.c — vigiar burnouts e o fim por compilações */
 int		start_monitor(t_sim *sim);
 
-/*scheduler.c - define a ordem de prioridades dos coderes para que possam pegar os dongles*/
+/* scheduler.c — quem vai à frente na fila de um dongle; entrar na fila */
 int		has_priority(t_request *a, t_request *b, int scheduler);
 void	join_queue(t_coder *coder, t_dongle *dongle);
 
-/*queue.c*/
+/* queue.c — a fila (heap) de cada dongle */
 void	queue_push(t_dongle *dongle, t_request request, int scheduler);
 void	queue_pop(t_dongle *dongle, int scheduler);
 #endif

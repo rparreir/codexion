@@ -3,7 +3,7 @@
 void	init_coders(t_sim *sim)
 {
 	int	i;
-	int n;
+	int	n;
 
 	i = 0;
 	while (i < sim->config.number_of_coders)
@@ -34,7 +34,6 @@ void	compile(t_coder *coder)
 	pthread_mutex_lock(&sim->stop_mutex);
 	coder->compiles_done++;
 	pthread_mutex_unlock(&sim->stop_mutex);
-	
 }
 
 void	*coder_routine(void *arg)

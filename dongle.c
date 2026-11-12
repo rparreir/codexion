@@ -1,5 +1,7 @@
 #include "codexion.h"
 
+/* cria os dongles: o memset põe tudo a 0 (taken, available_at, queue_size,
+   next_ticket); depois cada um ganha o seu mutex e o seu id */
 int	init_dongles(t_sim *sim)
 {
 	int	i;
@@ -11,6 +13,7 @@ int	init_dongles(t_sim *sim)
 			sim->config.number_of_coders);
 		return (0);
 	}
+	memset(sim->dongles, 0, sizeof(t_dongle) * sim->config.number_of_coders);
 	i = 0;
 	while (i < sim->config.number_of_coders)
 	{
@@ -22,10 +25,6 @@ int	init_dongles(t_sim *sim)
 			return (0);
 		}
 		sim->dongles[i].id = i + 1;
-		sim->dongles[i].taken = 0;
-		sim->dongles[i].available_at = 0;
-		sim->dongles[i].queue_size = 0;
-		sim->dongles[i].next_ticket= 0;
 		i++;
 	}
 	return (1);
@@ -50,7 +49,7 @@ int	take_dongle(t_coder *coder, t_dongle *dongle)
 	t_sim	*sim;
 
 	sim = coder->shared;
-	join_queue(coder, dongle); 
+	join_queue(coder, dongle);
 	while (1)
 	{
 		if (is_simulation_over(sim))
@@ -58,12 +57,11 @@ int	take_dongle(t_coder *coder, t_dongle *dongle)
 		pthread_mutex_lock (&dongle->mutex);
 		if (dongle->taken == 0
 			&& get_time_ms() >= dongle->available_at
-			&& dongle->queue[0].coder == coder) 
+			&& dongle->queue[0].coder == coder)
 		{
 			dongle->taken = 1;
 			queue_pop(dongle, sim->config.scheduler);
 			pthread_mutex_unlock (&dongle->mutex);
-			
 			print_status(coder, "has taken a dongle");
 			return (1);
 		}
