@@ -24,6 +24,8 @@ int	init_dongles(t_sim *sim)
 		sim->dongles[i].id = i + 1;
 		sim->dongles[i].taken = 0;
 		sim->dongles[i].available_at = 0;
+		sim->dongles[i].queue_size = 0;
+		sim->dongles[i].next_ticket= 0;
 		i++;
 	}
 	return (1);
@@ -48,22 +50,24 @@ int	take_dongle(t_coder *coder, t_dongle *dongle)
 	t_sim	*sim;
 
 	sim = coder->shared;
+	join_queue(coder, dongle); 
 	while (1)
 	{
 		if (is_simulation_over(sim))
 			return (0);
 		pthread_mutex_lock (&dongle->mutex);
-		if (dongle->taken == 0 && get_time_ms() >= dongle->available_at)
+		if (dongle->taken == 0
+			&& get_time_ms() >= dongle->available_at
+			&& dongle->queue[0].coder == coder) 
 		{
 			dongle->taken = 1;
+			queue_pop(dongle, sim->config.scheduler);
 			pthread_mutex_unlock (&dongle->mutex);
+			
 			print_status(coder, "has taken a dongle");
 			return (1);
 		}
-		else
-		{
-			pthread_mutex_unlock (&dongle->mutex);
-		}
+		pthread_mutex_unlock (&dongle->mutex);
 		usleep(500);
 	}
 }

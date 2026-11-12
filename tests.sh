@@ -3,8 +3,9 @@
 # Começou com 100 testes; vão-se juntando os de cada tick (fases 4 e 5).
 # Cada teste escreve PASS (verde), FAIL (vermelho) ou SKIP (amarelo, quando falta
 # uma ferramenta). No fim aparece o resumo; o script sai com 1 se houver falhas.
-# Os testes da secção 9 (margens de 10 ms sem burnout) podem falhar às vezes até à
-# fase 5: sem ordem justa (fifo/edf), quem espreita primeiro ganha.
+# O teste dos 200 coders com 10 ms de folga (secção 9) ainda falha às vezes no WSL2,
+# com e sem a fila da fase 5 (atraso do sistema com 200 threads): a confirmar em
+# Linux nativo, na escola.
 
 cd "$(dirname "$0")" || exit 1
 BIN=./codexion
@@ -41,8 +42,9 @@ skip()
 section() { printf "\n%s%s%s\n" "$BOLD" "$1" "$RESET"; }
 note() { printf "            %s\n" "$1"; }
 
-# corre o programa e guarda o stdout, o stderr e o código de saída
-run() { timeout 15 "$BIN" "$@" >"$TMP/out" 2>"$TMP/err"; CODE=$?; }
+# corre o programa e guarda o stdout, o stderr e o código de saída; dá 15 s, ou o
+# que estiver em RUN_TIMEOUT (ex.: RUN_TIMEOUT=40 expect_survive ...)
+run() { timeout "${RUN_TIMEOUT:-15}" "$BIN" "$@" >"$TMP/out" 2>"$TMP/err"; CODE=$?; }
 
 # erro de argumentos: sai com 1, mensagem no stderr, nada no stdout
 expect_error()
@@ -505,7 +507,47 @@ else
 	skip "nenhum dongle é apanhado antes de largado + cooldown" "não deu para fazer a cópia com o número do dongle"
 fi
 
-section "17. Primeira volta: que dongles apanha cada coder (só para ver, não conta)"
+section "17. Casos do tester.sh de um colega"
+# O tester.sh só corre o programa e mostra o output; aqui cada caso ganhou o "passa
+# se" que o subject pede. Os que ele repete já estão noutras secções: argumentos
+# errados (1, 2 e 5), 0 compilações (6 e 7), burnout de 1 ms (8) e cooldown maior
+# do que o prazo (16).
+expect_survive "básico com cooldown 10, fifo (4 800 200 200 200)" 4 800 200 200 200 5 10 fifo
+expect_survive "básico com cooldown 10, edf (4 800 200 200 200)" 4 800 200 200 200 5 10 edf
+expect_survive "10 coders com folga e cooldown 50" 10 10000 100 100 100 5 50 fifo
+expect_survive "cooldown de 1 ms e 20 compilações" 5 2000 100 100 100 20 1 fifo
+expect_survive "100 coders com tempos ímpares (66 24 87)" 100 10000 66 24 87 10 10 fifo
+# no tester.sh era 300; a folha de avaliação diz para nunca testar com mais de 200
+# coders (segundo o Ruben, que já avaliou o projeto), por isso fica o máximo, 200
+expect_survive "200 coders (o máximo da avaliação), edf" 200 10000 100 100 100 5 10 edf
+# estes dois demoram 13 a 16 s, mais do que os 15 s que o run dá por omissão
+RUN_TIMEOUT=40 expect_survive "20 coders com ações de 500 ms, edf (demora ~15 s)" 20 5000 500 500 500 10 100 edf
+RUN_TIMEOUT=40 expect_survive "ações de 2000 ms (demora ~13 s)" 3 10000 2000 2000 2000 2 100 fifo
+# "starvation": com 3 coders só 1 compila de cada vez. O 1.º compila aos 0; o 2.º só
+# pode aos 700 (600 de compile + 100 de cooldown); o 3.º só aos 1400, depois do prazo.
+expect_burnout "starvation, fifo: o 3.º coder não chega a compilar" 1000 3 1000 600 10 10 5 100 fifo
+expect_burnout "starvation, edf: o 3.º coder não chega a compilar" 1000 3 1000 600 10 10 5 100 edf
+expect_burnout "1 coder com edf" 1000 1 1000 200 200 200 5 50 edf
+# os outros dois detetores de erros de threads do valgrind (o tester.sh tem o modo
+# "helgrind"); ~2 s cada
+for tool in helgrind drd; do
+	if command -v valgrind >/dev/null; then
+		timeout 300 valgrind --tool="$tool" "$BIN" 4 800 200 200 200 2 10 fifo >/dev/null 2>"$TMP/vg"
+		if grep -q 'ERROR SUMMARY: 0 errors' "$TMP/vg"; then
+			pass "$tool limpo com 4 800 200 200 200 2 10 fifo"
+		else
+			fail "$tool com 4 800 200 200 200 2 10 fifo" "$(grep -m 1 'ERROR SUMMARY' "$TMP/vg")"
+		fi
+	else
+		skip "$tool" "o valgrind não está instalado"
+	fi
+done
+# O tester.sh também tinha 999 coders: ficou de fora, porque passa do máximo da
+# avaliação (200). Medido a 2026-11-11: com 999 threads a espreitar a cada 0,5 ms em
+# 8 núcleos (WSL2), o burned out chegou a sair 12 e 47 ms depois do prazo (o limite
+# da espera por polling, decisão 7 do /arch das fases 4 e 5).
+
+section "18. Primeira volta: que dongles apanha cada coder (só para ver, não conta)"
 # Usa a cópia com o número do dongle. Prazo de 2000 ms para todos chegarem ao 1.º
 # compile. O resultado muda de corrida para corrida: quem espreita primeiro ganha.
 args="5 2000 200 200 200 1 0 fifo"

@@ -25,15 +25,35 @@ typedef struct s_config
    e a t_sim tem os coders */
 typedef struct s_sim	t_sim;
 
+/* declaração antecipada: o t_request aponta para o t_coder,
+   que só é definido mais abaixo */
+typedef struct s_coder	t_coder;
+
+/* o pedido que um coder deixa na fila de um dongle enquanto espera:
+   deadline = cópia do burnout_deadline no momento em que pede;
+   ticket = senha, por ordem de chegada a este dongle (0, 1, 2...) */
+typedef struct s_request
+{
+	t_coder	*coder;
+	long	deadline;
+	long	ticket;
+}	t_request;
+
+/* queue = a fila (heap) de quem espera por este dongle: só 2 coders
+   usam cada dongle, por isso 2 lugares chegam;
+   next_ticket = a próxima senha a dar */
 typedef struct s_dongle
 {
 	pthread_mutex_t	mutex;
 	int				id;
 	int				taken;
 	long			available_at;
+	t_request		queue[2];
+	int				queue_size;
+	long			next_ticket;
 }	t_dongle;
 
-typedef struct s_coder
+struct s_coder
 {
 	int			id;
 	long		burnout_deadline;
@@ -42,7 +62,7 @@ typedef struct s_coder
 	t_sim		*shared;
 	t_dongle	*left;
 	t_dongle	*right;
-}	t_coder;
+};
 
 struct s_sim
 {
@@ -106,4 +126,11 @@ int		start_coders(t_sim *sim);
 /* monitor.c — vigiar burnouts e o fim por compilações */
 int		start_monitor(t_sim *sim);
 
+/*scheduler.c - define a ordem de prioridades dos coderes para que possam pegar os dongles*/
+int		has_priority(t_request *a, t_request *b, int scheduler);
+void	join_queue(t_coder *coder, t_dongle *dongle);
+
+/*queue.c*/
+void	queue_push(t_dongle *dongle, t_request request, int scheduler);
+void	queue_pop(t_dongle *dongle, int scheduler);
 #endif
