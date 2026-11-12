@@ -1,24 +1,27 @@
 NAME	= codexion
 
 CC		= cc
-CFLAGS	= -Wall -Wextra -Werror -pthread
+# -I include: o compilador procura o codexion.h na pasta include/
+CFLAGS	= -Wall -Wextra -Werror -pthread -I include
 
-# os .c do projeto
-SRCS	= main.c \
-		  parsing.c \
-		  parsing_helpers.c \
-		  time.c \
-		  sim.c \
-		  coder.c \
-		  monitor.c \
-		  sync.c \
-		  dongle.c \
-		  scheduler.c \
-		  queue.c
+# os .c do projeto, por pasta:
+# parsing/ (fase 1) · simulation/ (fases 2 e 3) · dongles/ (fases 4 e 5)
+SRCS	= src/main.c \
+		  src/parsing/parsing.c \
+		  src/parsing/parsing_helpers.c \
+		  src/simulation/coder.c \
+		  src/simulation/monitor.c \
+		  src/simulation/sim.c \
+		  src/simulation/sync.c \
+		  src/simulation/time.c \
+		  src/dongles/dongle.c \
+		  src/dongles/queue.c \
+		  src/dongles/scheduler.c
 
+# cada .o fica ao lado do seu .c
 OBJS	= $(SRCS:.c=.o)
 
-HEADER	= codexion.h
+HEADER	= include/codexion.h
 
 all: $(NAME)
 

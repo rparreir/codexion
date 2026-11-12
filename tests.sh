@@ -9,6 +9,10 @@
 
 cd "$(dirname "$0")" || exit 1
 BIN=./codexion
+# os .c do projeto (estão em src/ e nas suas pastas) e a pasta do codexion.h,
+# para as secções que compilam uma versão à parte (ThreadSanitizer e cópias)
+SRC_FILES=$(find src -name '*.c' | sort)
+INC=include
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
@@ -334,7 +338,8 @@ expect_survive "4 450 100 100 100 2 100 edf: o cooldown aperta, mas há folga �
 
 # ---------------------------------------------------------------------------
 section "13. ThreadSanitizer (data races e inversões de mutex)"
-if cc -Wall -Wextra -Werror -pthread -fsanitize=thread -g ./*.c -o "$TMP/codexion_tsan" 2>"$TMP/tsan_build"; then
+# shellcheck disable=SC2086
+if cc -Wall -Wextra -Werror -pthread -fsanitize=thread -g -I "$INC" $SRC_FILES -o "$TMP/codexion_tsan" 2>"$TMP/tsan_build"; then
 	PREFIX=""
 	command -v setarch >/dev/null && PREFIX="setarch $(uname -m) -R"
 	for args in "2 800 100 300 500 2 10 fifo" "4 800 200 200 200 3 10 fifo" "20 800 200 200 200 2 10 edf"; do
@@ -442,9 +447,11 @@ if [ -z "$bad_nb" ]; then pass "dois vizinhos nunca compilam ao mesmo tempo"; el
 if [ -z "$bad_lo" ]; then pass "na ordem do log, ninguém apanha um dongle antes de o vizinho escrever \"is debugging\""; else fail "na ordem do log, ninguém apanha um dongle antes de o vizinho escrever \"is debugging\"" "$bad_lo"; fi
 
 # Cópia que escreve também o número do dongle ("has taken dongle 3"), para as
-# secções 16 e 17. O programa a sério não muda.
+# secções 16 e 18. O programa a sério não muda. Os ficheiros vão todos para a mesma
+# pasta (os nomes não se repetem), por isso o #include "codexion.h" encontra-o ali.
 mkdir -p "$TMP/volta"
-cp ./*.c ./*.h "$TMP/volta/"
+# shellcheck disable=SC2086
+cp $SRC_FILES "$INC/codexion.h" "$TMP/volta/"
 sed -i 's/print_status(coder, "has taken a dongle");/{ char m[32]; snprintf(m, sizeof(m), "has taken dongle %d", dongle->id); print_status(coder, m); }/' "$TMP/volta/dongle.c"
 IDS=""
 if grep -q 'has taken dongle %d' "$TMP/volta/dongle.c" \
